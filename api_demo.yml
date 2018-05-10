@@ -1,0 +1,43 @@
+version: '3'
+services:
+  web:
+    image: 
+    networks: 
+      tmall:
+        ipv4_address: 192.168.32.4
+    expose:
+      - '80'
+    depends_on :
+      - server
+    restart: always
+  
+  server:
+    image: 
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - JAVA_OPTS=-Xmx1000m -Djava.security.egd=file:/dev/./urandom
+    networks:
+      tmall:
+        ipv4_address: 192.168.32.3
+    expose:
+      - '8080'
+    depends_on:
+      - rubyapi
+    restart: always
+  
+  rubyapi:
+    image: 
+    environment:
+      - RELEASE_MODE=production
+    networks:
+      tmall:
+        ipv4_address: 192.168.32.2
+    restart: always
+
+networks:
+  tmall: #单机环境采用默认bridge网络驱动
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+      - subnet: 192.168.32.0/24

@@ -1,0 +1,81 @@
+variables:
+  PROJECT_NAME: 项目名
+  IMAGE_NAME: registryURL/$PROJECT_NAME
+  JAR_FILE: ${PROJECT_NAME}-${CI_BUILD_TAG}.jar
+  TEST_DOMAIN_SUFFIX: 测试域名 
+  PROD_DOMAIN_SUFFIX: 正式服域名
+
+
+build:
+  stage: build
+  script:
+    - mvn clean -DskipTests package -U
+    - mvn sonar:sonar
+  only:
+    - master
+  tags:
+    - maven
+
+test-deploy:
+  variables:
+    DOMAIN: ${TEST_DOMAIN_SUFFIX}
+    PROFILE: test
+    INSTANCES: '1' 
+  stage: deploy
+  script:
+    - mvn versions:set -DnewVersion=$CI_BUILD_TAG
+    - mvn clean -DskipTests package -U
+    - cp target/*.jar docker/app.jar
+    - cd docker
+    - docker build -t $IMAGE_NAME:$CI_BUILD_TAG . # build the docker image
+    - docker push $IMAGE_NAME:$CI_BUILD_TAG
+    - docker-compose pull
+    - docker-compose -f docker-compose-test.yml -p $PROJECT_NAME up -d # start a application in 阿里云容器服务
+  only:
+    - /^.*-test$/
+  except:
+    - master
+  artifacts:
+    paths:
+    - target/*.jar
+    expire_in: 10 day
+  tags:
+    - test-docker
+
+
+prod-build:
+  stage: build
+  script:
+    - mvn versions:set -DnewVersion=$CI_BUILD_TAG
+    - mvn clean -DskipTests package -U
+    - cp target/*.jar docker/app.jar
+    - cd docker
+    - docker build -t $IMAGE_NAME:$CI_BUILD_TAG . 
+    - docker push $IMAGE_NAME:$CI_BUILD_TAG
+  only:
+    - /^.*-prod$/
+  except:
+    - master
+  artifacts:
+    paths:
+    - target/*.jar
+    expire_in: 10 day
+  tags:
+    - prod-docker
+
+prod-deploy:
+  variables:
+    DOMAIN: ${PROD_DOMAIN_SUFFIX}
+    PROFILE: prod
+    INSTANCES: '2' 
+  stage: deploy
+  script:
+    - cd docker
+    - docker-compose pull
+    - docker-compose -p $PROJECT_NAME up -d # start a application in 阿里云容器服务
+  only:
+    - /^.*-prod$/
+  except:
+    - master
+  tags:
+    - prod-docker

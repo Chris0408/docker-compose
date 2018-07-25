@@ -1,0 +1,33 @@
+version: '3'
+services:
+  registry:
+    image: registry:2.6
+    networks:
+      registry:
+        ipv4_address: 192.168.3.2
+    expose:
+      - '5000'
+    volumes:
+      - '/docker-registry:/var/lib/registry'
+      - '/etc/localtime:/etc/localtime'
+    restart: always
+  registryui:
+    image: klausmeyer/docker-registry-browser
+    environment:
+      - DOCKER_REGISTRY_URL=http://192.168.3.2:5000/v2
+      - ENABLE_DELETE_IMAGES=true
+    networks:
+      registry:
+        ipv4_address: 192.168.3.3
+    expose:
+     - '8080'
+    restart: always
+    depends_on:
+     - registry
+networks:
+  registry: 
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+      - subnet: 192.168.3.0/24
